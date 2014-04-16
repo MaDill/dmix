@@ -26,6 +26,11 @@
         <meta-data
             android:name="android.app.default_searchable"
             android:value=".SearchActivity" />
+
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
+
         <!-- android:debuggable="true" -->
         <activity
             android:name="com.namelessdev.mpdroid.MainMenuActivity"
