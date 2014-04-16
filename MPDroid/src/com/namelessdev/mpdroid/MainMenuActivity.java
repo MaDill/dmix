@@ -52,6 +52,9 @@ import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.PopupMenuCompat;
+import android.support.v7.app.MediaRouteButton;
+import android.support.v7.media.MediaControlIntent;
+import android.support.v7.media.MediaRouteSelector;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -233,6 +236,10 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
     private ArrayList<String> mTabList;
 
     private DisplayMode currentDisplayMode;
+
+    private MediaRouteButton mMediaRouteButton;
+
+    private ChromecastHelper mChromecastHelper;
 
     @Override
     public ArrayList<String> getTabList() {
@@ -547,6 +554,10 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
             }
         }
         refreshQueueIndicator(false);
+
+        // MediaRoute button
+        mMediaRouteButton = (MediaRouteButton) findViewById(R.id.header_media_route);
+        mChromecastHelper = new ChromecastHelper(this);
     }
 
     @Override
@@ -791,9 +802,20 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
     }
 
     @Override
+    protected void onPause() {
+        if ( mChromecastHelper != null ) {
+            mChromecastHelper.onPause();
+        }
+        super.onPause();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         backPressExitCount = 0;
+        if ( mChromecastHelper != null ) {
+            mChromecastHelper.onResume();
+        }
     }
 
     @Override
@@ -918,5 +940,13 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
         if (mSlidingLayout != null) {
             mSlidingLayout.mActionViews = new View[] { list };
         }
+    }
+
+    /**
+     * Get the activity's MediaRouteButton (if it exists)
+     * @return MediaRouteButton instance
+     */
+    public MediaRouteButton getMediaRouteButton() {
+        return mMediaRouteButton;
     }
 }

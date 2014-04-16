@@ -67,6 +67,14 @@
                             android:textSize="18sp" />
                     </FrameLayout>
 
+                    <android.support.v7.app.MediaRouteButton
+                        android:id="@+id/header_media_route"
+                        style="@android:style/Widget.Holo.ActionButton"
+                        android:layout_width="56dip"
+                        android:layout_height="match_parent"
+                        android:mediaRouteTypes="user"
+                        android:visibility="gone" />
+
                     <ImageButton
                         android:id="@+id/header_show_queue"
                         style="@android:style/Widget.Holo.ActionButton"
