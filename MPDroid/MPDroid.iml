@@ -76,7 +76,7 @@
     <orderEntry type="library" exported="" name="play-services-4.3.23" level="project" />
     <orderEntry type="library" exported="" name="drag-sort-listview-1.0" level="project" />
     <orderEntry type="library" exported="" name="internal_impl-19.0.1" level="project" />
-    <orderEntry type="library" exported="" name="support-v4-19.0.1" level="project" />
+    <orderEntry type="library" exported="" name="support-v4-19.1.0" level="project" />
     <orderEntry type="module" module-name="AndroidSlidingUpPanel" exported="" />
     <orderEntry type="module" module-name="JMPDComm" exported="" />
   </component>
