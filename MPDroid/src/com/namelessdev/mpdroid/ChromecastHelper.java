@@ -32,10 +32,14 @@ import org.a0z.mpd.MPDStatus;
 import org.a0z.mpd.Music;
 import org.a0z.mpd.exception.MPDServerException;
 
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.support.v7.media.MediaRouteSelector;
 import android.support.v7.media.MediaRouter;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 
 import java.io.IOException;
@@ -48,9 +52,25 @@ import java.io.IOException;
 public class ChromecastHelper extends MediaRouter.Callback
         implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
+    private static ChromecastHelper instance;
+
     public static final String TAG = "ChromecastHelper";
 
     public static final String APP_ID = "5D4E0A01";
+
+    private boolean isCasting = false;
+
+    private RemoteMediaPlayer mRemoteMediaPlayer;
+
+    private GoogleApiClient mApiClient;
+
+    private boolean mWaitingForReconnect = false;
+
+    private boolean mApplicationStarted = false;
+
+    private String mSessionId;
+
+    private CastDevice mSelectedDevice;
 
     private MPDApplication app;
 
@@ -62,33 +82,42 @@ public class ChromecastHelper extends MediaRouter.Callback
 
     private MediaRouter.Callback mMediaRouterCallback;
 
-    private CastDevice mSelectedDevice;
-
     private int mRouteCount = 0;
-
-    private GoogleApiClient mApiClient;
-
-    private boolean mWaitingForReconnect = false;
-
-    private boolean mApplicationStarted = false;
-
-    private String mSessionId;
 
     private Music mCurrentMusic;
 
-    private RemoteMediaPlayer mRemoteMediaPlayer;
+    public static ChromecastHelper getInstance(MPDApplication app) {
+        if (instance == null) {
+            instance = new ChromecastHelper(app);
+        }
+        return instance;
+    }
 
-    public ChromecastHelper(MainMenuActivity activity) {
-        app = (MPDApplication) activity.getApplication();
-        mMainMenuActivity = activity;
+    public ChromecastHelper(MPDApplication app) {
+        this.app = app;
 
-        mMediaRouter = MediaRouter.getInstance(activity.getApplicationContext());
+        mMediaRouter = MediaRouter.getInstance(app);
         mMediaRouteSelector = new MediaRouteSelector.Builder()
                 .addControlCategory(CastMediaControlIntent.categoryForCast(APP_ID))
                 .build();
+    }
 
-        // Configure the MediaRouteButton
+    public void attachMainMenuActivity(MainMenuActivity a) {
+        mMainMenuActivity = a;
         mMainMenuActivity.getMediaRouteButton().setRouteSelector(mMediaRouteSelector);
+        refreshRouteUI();
+    }
+
+    public void detachMainMenuActivity() {
+        mMainMenuActivity = null;
+    }
+
+    public boolean isCasting() {
+        return isCasting;
+    }
+
+    public GoogleApiClient getApiClient() {
+        return mApiClient;
     }
 
     public void onResume() {
@@ -138,10 +167,16 @@ public class ChromecastHelper extends MediaRouter.Callback
 
     public void startCasting()
     {
+        isCasting = true;
+        app.startService(NotificationService.class,
+                NotificationService.ACTION_SHOW_NOTIFICATION);
+
+        app.getApplicationState().notificationMode = true;
+
         Cast.CastOptions.Builder apiOptionsBuilder = Cast.CastOptions
                 .builder(mSelectedDevice, new CastListener());
 
-        mApiClient = new GoogleApiClient.Builder(mMainMenuActivity)
+        mApiClient = new GoogleApiClient.Builder(app)
                 .addApi(Cast.API, apiOptionsBuilder.build())
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
@@ -178,15 +213,13 @@ public class ChromecastHelper extends MediaRouter.Callback
         }
     }
 
-    private void teardown() {
+    public void stopCasting() {
         Log.d(TAG, "Tearing down ChromecastHelper");
+        isCasting = false;
         if (mApiClient != null) {
             if (mApplicationStarted) {
                 if (mApiClient.isConnected()) {
                     Cast.CastApi.stopApplication(mApiClient, mSessionId);
-                    if (mRemoteMediaPlayer != null) {
-                        mRemoteMediaPlayer.stop(mApiClient);
-                    }
                     mApiClient.disconnect();
                 }
                 mApplicationStarted = false;
@@ -198,6 +231,65 @@ public class ChromecastHelper extends MediaRouter.Callback
         mSessionId = null;
     }
 
+    private void refreshRouteUI() {
+        if (mMainMenuActivity != null) {
+            if (mRouteCount == 0) {
+                mMainMenuActivity.getMediaRouteButton().setVisibility(View.GONE);
+            } else {
+                mMainMenuActivity.getMediaRouteButton().setVisibility(View.VISIBLE);
+            }
+        }
+    }
+
+    /**
+     * Handle the volume buttons
+     * @param event
+     * @return If the event has been consumed or not
+     */
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if ( !isCasting ) {
+            return false;
+        }
+        int action = event.getAction();
+        int keyCode = event.getKeyCode();
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_VOLUME_UP:
+                if (action == KeyEvent.ACTION_DOWN) {
+                    if (mRemoteMediaPlayer != null) {
+                        double currentVolume = Cast.CastApi.getVolume(mApiClient);
+                        if (currentVolume < 1.0) {
+                            try {
+                                Cast.CastApi.setVolume(mApiClient,
+                                        Math.min(currentVolume + 0.1, 1.0));
+                            } catch (Exception e) {
+                                Log.e(TAG, "Unable to set chromecast volume", e);
+                            }
+                        }
+                    }
+                }
+                return true;
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+                if (action == KeyEvent.ACTION_DOWN) {
+                    if (mRemoteMediaPlayer != null) {
+                        double currentVolume = Cast.CastApi.getVolume(mApiClient);
+                        if (currentVolume > 0.0) {
+                            try {
+                                Cast.CastApi.setVolume(mApiClient,
+                                        Math.max(currentVolume - 0.1, 0.0));
+                            } catch (Exception e) {
+                                Log.e(TAG, "Unable to set chromecast volume", e);
+                            }
+                        }
+                    } else {
+                        Log.e(TAG, "dispatchKeyEvent - volume down");
+                    }
+                }
+                return true;
+            default:
+                return false;
+        }
+    }
+
     /**
      * MediaRouter callbacks
      */
@@ -205,7 +297,7 @@ public class ChromecastHelper extends MediaRouter.Callback
     public void onRouteAdded(MediaRouter router, MediaRouter.RouteInfo route) {
         if (++mRouteCount >= 1) {
             // Show the button when a device is discovered.
-            mMainMenuActivity.getMediaRouteButton().setVisibility(View.VISIBLE);
+            refreshRouteUI();
         }
     }
 
@@ -213,7 +305,7 @@ public class ChromecastHelper extends MediaRouter.Callback
     public void onRouteRemoved(MediaRouter router, MediaRouter.RouteInfo route) {
         if (--mRouteCount == 0) {
             // Hide the button if there are no devices discovered.
-            mMainMenuActivity.getMediaRouteButton().setVisibility(View.GONE);
+            refreshRouteUI();
         }
     }
 
@@ -221,13 +313,13 @@ public class ChromecastHelper extends MediaRouter.Callback
     public void onRouteSelected(MediaRouter router, MediaRouter.RouteInfo info) {
         // Handle route selection.
         mSelectedDevice = CastDevice.getFromBundle(info.getExtras());
-
         startCasting();
     }
 
     @Override
     public void onRouteUnselected(MediaRouter router, MediaRouter.RouteInfo info) {
         mSelectedDevice = null;
+        stopCasting();
     }
 
     /**
@@ -256,7 +348,7 @@ public class ChromecastHelper extends MediaRouter.Callback
                                             mApplicationStarted = true;
                                             loadMPDStream();
                                         } else {
-                                            teardown();
+                                            stopCasting();
                                         }
                                     }
                                 }

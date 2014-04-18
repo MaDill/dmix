@@ -16,6 +16,8 @@
 
 package com.namelessdev.mpdroid;
 
+import com.google.android.gms.cast.Cast;
+
 import com.namelessdev.mpdroid.MPDroidActivities.MPDroidFragmentActivity;
 import com.namelessdev.mpdroid.fragments.BrowseFragment;
 import com.namelessdev.mpdroid.fragments.LibraryFragment;
@@ -53,8 +55,6 @@ import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.PopupMenuCompat;
 import android.support.v7.app.MediaRouteButton;
-import android.support.v7.media.MediaControlIntent;
-import android.support.v7.media.MediaRouteSelector;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -238,8 +238,6 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
     private DisplayMode currentDisplayMode;
 
     private MediaRouteButton mMediaRouteButton;
-
-    private ChromecastHelper mChromecastHelper;
 
     @Override
     public ArrayList<String> getTabList() {
@@ -557,7 +555,7 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
 
         // MediaRoute button
         mMediaRouteButton = (MediaRouteButton) findViewById(R.id.header_media_route);
-        mChromecastHelper = new ChromecastHelper(this);
+        ChromecastHelper.getInstance(app).attachMainMenuActivity(this);
     }
 
     @Override
@@ -611,29 +609,39 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
 
     @Override
     public boolean onKeyUp(int keyCode, final KeyEvent event) {
-        switch (event.getKeyCode()) {
-            case KeyEvent.KEYCODE_VOLUME_UP:
-            case KeyEvent.KEYCODE_VOLUME_DOWN:
-                if (event.isTracking() && !event.isCanceled()
-                        && !app.getApplicationState().streamingMode) {
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                app.oMPDAsyncHelper.oMPD
-                                        .adjustVolume(
-                                                event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_UP
-                                                        ? NowPlayingFragment.VOLUME_STEP
-                                                        : -NowPlayingFragment.VOLUME_STEP);
-                            } catch (MPDServerException e) {
-                                e.printStackTrace();
+        if (!ChromecastHelper.getInstance(app).isCasting()) {
+            switch (event.getKeyCode()) {
+                case KeyEvent.KEYCODE_VOLUME_UP:
+                case KeyEvent.KEYCODE_VOLUME_DOWN:
+                    if (event.isTracking() && !event.isCanceled()
+                            && !app.getApplicationState().streamingMode) {
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    app.oMPDAsyncHelper.oMPD
+                                            .adjustVolume(
+                                                    event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_UP
+                                                            ? NowPlayingFragment.VOLUME_STEP
+                                                            : -NowPlayingFragment.VOLUME_STEP);
+                                } catch (MPDServerException e) {
+                                    e.printStackTrace();
+                                }
                             }
-                        }
-                    }).start();
-                }
-                return true;
+                        }).start();
+                    }
+                    return true;
+            }
         }
         return super.onKeyUp(keyCode, event);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (ChromecastHelper.getInstance(app).dispatchKeyEvent(event)) {
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     @Override
@@ -803,9 +811,7 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
 
     @Override
     protected void onPause() {
-        if ( mChromecastHelper != null ) {
-            mChromecastHelper.onPause();
-        }
+        ChromecastHelper.getInstance(app).onPause();
         super.onPause();
     }
 
@@ -813,9 +819,7 @@ public class MainMenuActivity extends MPDroidFragmentActivity implements OnNavig
     protected void onResume() {
         super.onResume();
         backPressExitCount = 0;
-        if ( mChromecastHelper != null ) {
-            mChromecastHelper.onResume();
-        }
+        ChromecastHelper.getInstance(app).onResume();
     }
 
     @Override

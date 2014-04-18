@@ -33,6 +33,7 @@ import android.content.DialogInterface.OnClickListener;
 import android.content.DialogInterface.OnKeyListener;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.StrictMode;
 import android.preference.PreferenceManager;
 import android.util.Log;
@@ -225,6 +226,32 @@ public class MPDApplication extends Application implements ConnectionListener {
                 } catch (IllegalArgumentException e) {
                     // We don't care, it has already been destroyed
                 }
+            }
+        }
+    }
+
+    /**
+     * Enables and starts a service.
+     *
+     * @param serviceClass The class of the service to start.
+     * @param intentAction The starting intent action name. If null, the service
+     *               will be enabled but not started.
+     */
+    public void startService(final Class<?> serviceClass, final String intentAction) {
+        final PackageManager packageManager = getPackageManager();
+        final Intent intent = new Intent(this, serviceClass);
+
+        if (packageManager != null) {
+            if (PackageManager.COMPONENT_ENABLED_STATE_ENABLED !=
+                    packageManager.getApplicationEnabledSetting(this.getPackageName())) {
+
+                packageManager.setComponentEnabledSetting(intent.getComponent(),
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.DONT_KILL_APP);
+            }
+            if (intentAction != null) {
+                intent.setAction(intentAction);
+                this.startService(intent);
             }
         }
     }
