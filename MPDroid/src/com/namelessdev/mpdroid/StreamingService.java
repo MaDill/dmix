@@ -194,7 +194,7 @@ final public class StreamingService extends Service implements
             windUpResources();
         }
 
-        final String streamSource = getStreamSource();
+        final String streamSource = getStreamSource(app);
         final int ASYNC_IDLE = 1500;
         preparingStreaming = true;
         stopControlHandlers();
@@ -335,7 +335,7 @@ final public class StreamingService extends Service implements
         isPlaying = MPDStatus.MPD_STATE_PLAYING.equals(getState());
     }
 
-    private String getStreamSource() {
+    public static String getStreamSource(final MPDApplication app) {
         return "http://"
                 + app.oMPDAsyncHelper.getConnectionSettings().getConnectionStreamingServer() + ":"
                 + app.oMPDAsyncHelper.getConnectionSettings().iPortStreaming + "/"
