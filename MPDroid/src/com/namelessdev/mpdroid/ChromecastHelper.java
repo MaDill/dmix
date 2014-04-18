@@ -32,17 +32,12 @@ import org.a0z.mpd.MPDStatus;
 import org.a0z.mpd.Music;
 import org.a0z.mpd.exception.MPDServerException;
 
-import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.support.v7.media.MediaRouteSelector;
 import android.support.v7.media.MediaRouter;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
-
-import java.io.IOException;
 
 /**
  * Helper for keeping the chromecast code out of the main activity
